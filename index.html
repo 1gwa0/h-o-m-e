@@ -1,0 +1,79 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>展覽互動動畫</title>
+    <style>
+      body, html {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background: black;
+      }
+      video {
+        position: absolute;
+        width: 100vw;
+        height: 100vh;
+        object-fit: cover;
+      }
+      #p5-holder {
+        display: none;
+        position: absolute;
+        width: 100vw;
+        height: 100vh;
+        background: black;
+      }
+    </style>
+  </head>
+  <body>
+    <video id="introVideo" autoplay muted playsinline>
+      <source src="circle.mp4" type="video/mp4" />
+    </video>
+    <div id="p5-holder"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+    <script>
+      const videoElement = document.getElementById("introVideo");
+      videoElement.addEventListener("ended", () => {
+        videoElement.style.display = "none";
+        document.getElementById("p5-holder").style.display = "block";
+        startP5();
+      });
+
+      function startP5() {
+        new p5(p => {
+          let img;
+          let maskLayer;
+
+          p.preload = () => {
+            img = p.loadImage("finalImage.png");
+          };
+
+          p.setup = () => {
+            p.createCanvas(windowWidth, windowHeight).parent("p5-holder");
+            maskLayer = p.createGraphics(p.width, p.height);
+            maskLayer.background(255);
+            maskLayer.noStroke();
+          };
+
+          p.draw = () => {
+            p.image(img, 0, 0, p.width, p.height);
+            p.image(maskLayer, 0, 0, p.width, p.height);
+            if (p.mouseIsPressed) {
+              maskLayer.erase();
+              maskLayer.ellipse(p.mouseX, p.mouseY, 80, 80);
+              maskLayer.noErase();
+            }
+          };
+
+          p.windowResized = () => {
+            p.resizeCanvas(windowWidth, windowHeight);
+            maskLayer = p.createGraphics(p.width, p.height);
+            maskLayer.background(255);
+          };
+        });
+      }
+    </script>
+  </body>
+</html>
