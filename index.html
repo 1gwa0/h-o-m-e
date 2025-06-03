@@ -15,14 +15,20 @@
       width: 100vw;
       height: 100vh;
       object-fit: cover;
+      z-index: 1;
     }
     #p5-holder {
-      display: none;
+      display: block;
       position: absolute;
       width: 100vw;
       height: 100vh;
       background: black;
-      z-index: 10;
+      opacity: 0;
+      transition: opacity 1s ease-in-out;
+      z-index: 2;
+    }
+    #p5-holder.active {
+      opacity: 1;
     }
   </style>
 </head>
@@ -34,15 +40,17 @@
 
   <!-- p5.js -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
-  <!-- ml5.js for handpose -->
+  <!-- ml5.js -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/ml5/0.12.2/ml5.min.js"></script>
 
   <script>
     const videoElement = document.getElementById("introVideo");
+    const holder = document.getElementById("p5-holder");
 
     videoElement.addEventListener("ended", () => {
+      // 自動轉場（影片漸退、p5 畫面淡入）
       videoElement.style.display = "none";
-      document.getElementById("p5-holder").style.display = "block";
+      holder.classList.add("active");
       startP5();
     });
 
@@ -61,32 +69,34 @@
         p.setup = () => {
           p.createCanvas(window.innerWidth, window.innerHeight).parent("p5-holder");
 
-          // 初始化遮罩
+          // 遮罩初始化
           maskLayer = p.createGraphics(p.width, p.height);
           maskLayer.background(255);
           maskLayer.noStroke();
 
-          // 啟動攝影機
-          cam = p.createCapture(
-            { video: true },
-            stream => console.log("📷 鏡頭已啟用")
-          );
+          // 開鏡頭
+          cam = p.createCapture(p.VIDEO, stream => {
+            console.log("📷 鏡頭啟動");
+          });
           cam.size(p.width, p.height);
           cam.hide();
 
-          // 初始化 handpose
+          // 載入 handpose
           handpose = ml5.handpose(cam, () => {
-            console.log("🤖 handpose 模型已載入");
+            console.log("🧠 handpose 載入完成");
           });
-
-          // 接收預測結果
           handpose.on("predict", results => {
             predictions = results;
           });
         };
 
         p.draw = () => {
-          p.clear();
+          // 畫出鏡頭畫面以確認不是黑的
+          p.push();
+          p.translate(p.width, 0); // 鏡像反轉
+          p.scale(-1, 1);
+          p.image(cam, 0, 0, p.width, p.height);
+          p.pop();
 
           // 顯示背景圖
           p.image(bgImg, 0, 0, p.width, p.height);
@@ -94,18 +104,18 @@
           // 疊上遮罩
           p.image(maskLayer, 0, 0, p.width, p.height);
 
-          // 處理每隻手
+          // 用食指「擦」洞
           for (let hand of predictions) {
-            let indexTip = hand.landmarks[8]; // 食指指尖
-            let x = p.map(indexTip[0], 0, cam.width, 0, p.width);
-            let y = p.map(indexTip[1], 0, cam.height, 0, p.height);
+            const indexTip = hand.landmarks[8];
+            const x = p.map(indexTip[0], 0, cam.width, 0, p.width);
+            const y = p.map(indexTip[1], 0, cam.height, 0, p.height);
 
-            // 擦除洞
+            // 擦除圓
             maskLayer.erase();
             maskLayer.ellipse(x, y, 80, 80);
             maskLayer.noErase();
 
-            // 可選：視覺化食指位置（紅圓）
+            // 顯示紅圈（可移除）
             p.fill(255, 0, 0);
             p.noStroke();
             p.ellipse(x, y, 30, 30);
