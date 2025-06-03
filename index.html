@@ -1,47 +1,31 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>鏡頭測試</title>
-  <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      overflow: hidden;
-      background: black;
-    }
-    #p5-holder {
-      width: 100vw;
-      height: 100vh;
-    }
-  </style>
-</head>
-<body>
-  <div id="p5-holder"></div>
+<script>
+  new p5(p => {
+    let cam;
+    let camReady = false;
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
-  <script>
-    new p5(p => {
-      let cam;
+    p.setup = () => {
+      p.createCanvas(window.innerWidth, window.innerHeight).parent("p5-holder");
+      cam = p.createCapture(p.VIDEO, stream => {
+        console.log("📷 鏡頭啟動成功");
+        camReady = true;
+      });
+      cam.size(p.width, p.height);
+      cam.hide();
+    };
 
-      p.setup = () => {
-        p.createCanvas(window.innerWidth, window.innerHeight).parent("p5-holder");
-        cam = p.createCapture(p.VIDEO, stream => {
-          console.log("📷 鏡頭啟動成功");
-        });
-        cam.size(p.width, p.height);
-        cam.hide();
-      };
-
-      p.draw = () => {
-        p.background(0);
+    p.draw = () => {
+      p.background(0);
+      if (camReady) {
         p.image(cam, 0, 0, p.width, p.height);
-      };
+      } else {
+        p.fill(255);
+        p.textAlign(p.CENTER, p.CENTER);
+        p.text("正在啟動鏡頭...", p.width / 2, p.height / 2);
+      }
+    };
 
-      p.windowResized = () => {
-        p.resizeCanvas(window.innerWidth, window.innerHeight);
-      };
-    });
-  </script>
-</body>
-</html>
+    p.windowResized = () => {
+      p.resizeCanvas(window.innerWidth, window.innerHeight);
+    };
+  });
+</script>
