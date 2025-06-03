@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>展覽互動動畫</title>
+  <title>鏡頭測試</title>
   <style>
     html, body {
       margin: 0;
@@ -10,125 +10,38 @@
       overflow: hidden;
       background: black;
     }
-    video {
-      position: absolute;
-      width: 100vw;
-      height: 100vh;
-      object-fit: cover;
-      z-index: 1;
-    }
     #p5-holder {
-      display: block;
-      position: absolute;
       width: 100vw;
       height: 100vh;
-      background: black;
-      opacity: 0;
-      transition: opacity 1s ease-in-out;
-      z-index: 2;
-    }
-    #p5-holder.active {
-      opacity: 1;
     }
   </style>
 </head>
 <body>
-  <video id="introVideo" autoplay muted playsinline>
-    <source src="circle.mp4" type="video/mp4" />
-  </video>
   <div id="p5-holder"></div>
 
-  <!-- p5.js -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
-  <!-- ml5.js -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/ml5/0.12.2/ml5.min.js"></script>
-
   <script>
-    const videoElement = document.getElementById("introVideo");
-    const holder = document.getElementById("p5-holder");
+    new p5(p => {
+      let cam;
 
-    videoElement.addEventListener("ended", () => {
-      // 自動轉場（影片漸退、p5 畫面淡入）
-      videoElement.style.display = "none";
-      holder.classList.add("active");
-      startP5();
+      p.setup = () => {
+        p.createCanvas(window.innerWidth, window.innerHeight).parent("p5-holder");
+        cam = p.createCapture(p.VIDEO, stream => {
+          console.log("📷 鏡頭啟動成功");
+        });
+        cam.size(p.width, p.height);
+        cam.hide();
+      };
+
+      p.draw = () => {
+        p.background(0);
+        p.image(cam, 0, 0, p.width, p.height);
+      };
+
+      p.windowResized = () => {
+        p.resizeCanvas(window.innerWidth, window.innerHeight);
+      };
     });
-
-    function startP5() {
-      new p5(p => {
-        let cam;
-        let handpose;
-        let predictions = [];
-        let bgImg;
-        let maskLayer;
-
-        p.preload = () => {
-          bgImg = p.loadImage("finalImage.png");
-        };
-
-        p.setup = () => {
-          p.createCanvas(window.innerWidth, window.innerHeight).parent("p5-holder");
-
-          // 遮罩初始化
-          maskLayer = p.createGraphics(p.width, p.height);
-          maskLayer.background(255);
-          maskLayer.noStroke();
-
-          // 開鏡頭
-          cam = p.createCapture(p.VIDEO, stream => {
-            console.log("📷 鏡頭啟動");
-          });
-          cam.size(p.width, p.height);
-          cam.hide();
-
-          // 載入 handpose
-          handpose = ml5.handpose(cam, () => {
-            console.log(cam.width, cam.height);
-          });
-          handpose.on("predict", results => {
-            predictions = results;
-          });
-        };
-
-        p.draw = () => {
-          // 畫出鏡頭畫面以確認不是黑的
-          p.push();
-          p.translate(p.width, 0); // 鏡像反轉
-          p.scale(-1, 1);
-          p.image(cam, 0, 0, p.width, p.height);
-          p.pop();
-
-          // 顯示背景圖
-          p.image(bgImg, 0, 0, p.width, p.height);
-
-          // 疊上遮罩
-          p.image(maskLayer, 0, 0, p.width, p.height);
-
-          // 用食指「擦」洞
-          for (let hand of predictions) {
-            const indexTip = hand.landmarks[8];
-            const x = p.map(indexTip[0], 0, cam.width, 0, p.width);
-            const y = p.map(indexTip[1], 0, cam.height, 0, p.height);
-
-            // 擦除圓
-            maskLayer.erase();
-            maskLayer.ellipse(x, y, 80, 80);
-            maskLayer.noErase();
-
-            // 顯示紅圈（可移除）
-            p.fill(255, 0, 0);
-            p.noStroke();
-            p.ellipse(x, y, 30, 30);
-          }
-        };
-
-        p.windowResized = () => {
-          p.resizeCanvas(window.innerWidth, window.innerHeight);
-          maskLayer = p.createGraphics(p.width, p.height);
-          maskLayer.background(255);
-        };
-      });
-    }
   </script>
 </body>
 </html>
