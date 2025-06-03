@@ -23,59 +23,30 @@
   <script>
     new p5(p => {
       let cam;
-      let state = "intro"; // 初始狀態為動畫
-      let introStartTime;
-      let t = 0;
+      let camReady = false;
 
       p.setup = () => {
         p.createCanvas(window.innerWidth, window.innerHeight).parent("p5-holder");
-        introStartTime = p.millis();
-      };
-
-      p.draw = () => {
-        if (state === "intro") {
-          // 🎬 動畫畫面（可以自訂內容）
-          p.background(0);
-          p.fill(255);
-          p.textAlign(p.CENTER, p.CENTER);
-          p.textSize(48 + 8 * p.sin(t));
-          p.text("歡迎使用", p.width / 2, p.height / 2);
-          t += 0.1;
-
-          // ⏱ 3 秒後切換狀態
-          if (p.millis() - introStartTime > 3000) {
-            state = "camera";
-            initCamera();
-          }
-        }
-
-        else if (state === "camera") {
-          if (cam) {
-            p.image(cam, 0, 0, p.width, p.height);
-
-            // ✨ 鏡頭互動動畫範例：中心閃動圓圈
-            const r = 50 + 20 * p.sin(t);
-            p.noFill();
-            p.stroke(255, 0, 0);
-            p.strokeWeight(3);
-            p.ellipse(p.width / 2, p.height / 2, r, r);
-            t += 0.05;
-          } else {
-            p.background(0);
-            p.fill(255);
-            p.textAlign(p.CENTER, p.CENTER);
-            p.textSize(24);
-            p.text("正在啟動鏡頭...", p.width / 2, p.height / 2);
-          }
-        }
-      };
-
-      const initCamera = () => {
         cam = p.createCapture(p.VIDEO, () => {
           console.log("📷 鏡頭啟動成功");
+          camReady = true;
         });
         cam.size(p.width, p.height);
         cam.hide();
+      };
+
+      p.draw = () => {
+        p.background(0);
+
+        if (camReady) {
+          p.image(cam, 0, 0, p.width, p.height);
+        } else {
+          // 可選提示字，也可以移除
+          p.fill(255);
+          p.textAlign(p.CENTER, p.CENTER);
+          p.textSize(24);
+          p.text("正在啟動鏡頭...", p.width / 2, p.height / 2);
+        }
       };
 
       p.windowResized = () => {
