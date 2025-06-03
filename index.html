@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>鏡頭測試 Safari 版</title>
+  <title>展覽互動動畫</title>
   <style>
     html, body {
       margin: 0;
@@ -10,94 +10,120 @@
       overflow: hidden;
       background: black;
     }
-    #p5-holder {
+    video {
+      position: absolute;
       width: 100vw;
       height: 100vh;
+      object-fit: cover;
+      z-index: 1;
+    }
+    #p5-holder {
+      display: block;
+      position: absolute;
+      width: 100vw;
+      height: 100vh;
+      background: black;
+      opacity: 0;
+      transition: opacity 1s ease-in-out;
+      z-index: 2;
+    }
+    #p5-holder.active {
+      opacity: 1;
     }
   </style>
 </head>
 <body>
+  <video id="introVideo" autoplay muted playsinline>
+    <source src="circle.mp4" type="video/mp4" />
+  </video>
   <div id="p5-holder"></div>
 
+  <!-- p5.js -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <!-- ml5.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ml5/0.12.2/ml5.min.js"></script>
+
   <script>
-    new p5(p => {
-      let cam;
-      let camReady = false;
-      let state = "intro"; // intro → waitClick → camera
-      let introStartTime;
-      let t = 0;
+    const videoElement = document.getElementById("introVideo");
+    const holder = document.getElementById("p5-holder");
 
-      p.setup = () => {
-        p.createCanvas(window.innerWidth, window.innerHeight).parent("p5-holder");
-        introStartTime = p.millis();
-      };
-
-      p.draw = () => {
-        p.background(0);
-
-        if (state === "intro") {
-          // 🔸 你可以替換這裡的動畫內容
-          p.fill(255);
-          p.noStroke();
-          p.ellipse(p.width / 2, p.height / 2, 100 + 30 * p.sin(t));
-          t += 0.1;
-
-          if (p.millis() - introStartTime > 3000) {
-            state = "waitClick";
-          }
-        }
-
-        else if (state === "waitClick") {
-          p.fill(255);
-          p.textAlign(p.CENTER, p.CENTER);
-          p.textSize(24);
-          p.text("點擊畫面以啟動鏡頭", p.width / 2, p.height / 2);
-        }
-
-        else if (state === "camera") {
-          if (camReady) {
-            p.image(cam, 0, 0, p.width, p.height);
-
-            // 加上互動畫面動畫（範例）
-            const r = 50 + 20 * p.sin(t);
-            p.noFill();
-            p.stroke(255, 0, 0);
-            p.strokeWeight(3);
-            p.ellipse(p.width / 2, p.height / 2, r, r);
-            t += 0.05;
-          } else {
-            p.fill(255);
-            p.textAlign(p.CENTER, p.CENTER);
-            p.textSize(20);
-            p.text("鏡頭載入中...", p.width / 2, p.height / 2);
-          }
-        }
-      };
-
-      p.mousePressed = () => {
-        if (state === "waitClick") {
-          initCamera(); // Safari 限制：只能在使用者觸發後呼叫
-          state = "camera";
-        }
-      };
-
-      function initCamera() {
-        cam = p.createCapture(p.VIDEO);
-        cam.size(p.width, p.height);
-        cam.hide();
-
-        // ✅ Safari 需要用 loadeddata 來檢查是否可顯示影像
-        cam.elt.addEventListener('loadeddata', () => {
-          camReady = true;
-          console.log("📷 鏡頭已準備好（Safari）");
-        });
-      }
-
-      p.windowResized = () => {
-        p.resizeCanvas(window.innerWidth, window.innerHeight);
-      };
+    videoElement.addEventListener("ended", () => {
+      // 自動轉場（影片漸退、p5 畫面淡入）
+      videoElement.style.display = "none";
+      holder.classList.add("active");
+      startP5();
     });
+
+    function startP5() {
+      new p5(p => {
+        let cam;
+        let handpose;
+        let predictions = [];
+        let bgImg;
+        let maskLayer;
+
+        p.preload = () => {
+          bgImg = p.loadImage("finalImage.png");
+        };
+
+        p.setup = () => {
+          p.createCanvas(window.innerWidth, window.innerHeight).parent("p5-holder");
+
+          // 遮罩初始化
+          maskLayer = p.createGraphics(p.width, p.height);
+          maskLayer.background(255);
+          maskLayer.noStroke();
+
+          // 開鏡頭
+          cam = p.createCapture(p.VIDEO, stream => {
+            console.log("📷 鏡頭啟動");
+          });
+          cam.size(p.width, p.height);
+          cam.hide();
+
+          // 載入 handpose
+          handpose = ml5.handpose(cam, () => {
+            console.log("🧠 handpose 載入完成");
+          });
+          handpose.on("predict", results => {
+            predictions = results;
+          });
+        };
+
+        p.draw = () => {
+          // 畫出鏡頭畫面以確認不是黑的
+          p.push();
+          p.translate(p.width, 0); // 鏡像反轉
+          p.scale(-1, 1);
+          p.image(cam, 0, 0, p.width, p.height);
+          p.pop();
+
+          // 顯示背景圖
+          p.image(bgImg, 0, 0, p.width, p.height);
+
+          // 疊上遮罩
+          p.image(maskLayer, 0, 0, p.width, p.height);
+
+          // 用食指「擦」洞
+          for (let hand of predictions) {
+            const indexTip = hand.landmarks[8];
+            const x = p.map(indexTip[0], 0, cam.width, 0, p.width);
+            const y = p.map(indexTip[1], 0, cam.height, 0, p.height);
+
+            // 擦除圓
+            maskLayer.erase();
+            maskLayer.ellipse(x, y, 80, 80);
+            maskLayer.noErase();
+          }
+        };
+
+        p.windowResized = () => {
+          p.resizeCanvas(window.innerWidth, window.innerHeight);
+          maskLayer = p.createGraphics(p.width, p.height);
+          maskLayer.background(255);
+        };
+      });
+    }
   </script>
 </body>
 </html>
