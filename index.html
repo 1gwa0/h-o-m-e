@@ -1,91 +1,124 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <title>展覽互動動畫</title>
-    <style>
-      body, html {
-        margin: 0;
-        padding: 0;
-        overflow: hidden;
-        background: black;
-      }
-      video {
-        position: absolute;
-        width: 100vw;
-        height: 100vh;
-        object-fit: cover;
-      }
-      #p5-holder {
-        display: none;
-        position: absolute;
-        width: 100vw;
-        height: 100vh;
-        background: black;
-        z-index: 10;
-      }
-    </style>
-  </head>
-  <body>
-    <video id="introVideo" autoplay muted playsinline>
-      <source src="circle.mp4" type="video/mp4" />
-    </video>
-    <div id="p5-holder"></div>
+<head>
+  <meta charset="UTF-8" />
+  <title>展覽互動動畫</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: black;
+    }
+    video {
+      position: absolute;
+      width: 100vw;
+      height: 100vh;
+      object-fit: cover;
+    }
+    #p5-holder {
+      display: none;
+      position: absolute;
+      width: 100vw;
+      height: 100vh;
+      background: black;
+      z-index: 10;
+    }
+  </style>
+</head>
+<body>
+  <video id="introVideo" autoplay muted playsinline>
+    <source src="circle.mp4" type="video/mp4" />
+  </video>
+  <div id="p5-holder"></div>
 
-    <!-- p5.js -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
-    <!-- ml5.js with handpose -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/ml5/0.12.2/ml5.min.js"></script>
+  <!-- p5.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <!-- ml5.js for handpose -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ml5/0.12.2/ml5.min.js"></script>
 
-    <script>
-      const videoElement = document.getElementById("introVideo");
+  <script>
+    const videoElement = document.getElementById("introVideo");
 
-      videoElement.addEventListener("ended", () => {
-        videoElement.style.display = "none";
-        document.getElementById("p5-holder").style.display = "block";
-        startP5();
+    videoElement.addEventListener("ended", () => {
+      videoElement.style.display = "none";
+      document.getElementById("p5-holder").style.display = "block";
+      startP5();
+    });
+
+    function startP5() {
+      new p5(p => {
+        let cam;
+        let handpose;
+        let predictions = [];
+        let bgImg;
+        let maskLayer;
+
+        p.preload = () => {
+          bgImg = p.loadImage("finalImage.png");
+        };
+
+        p.setup = () => {
+          p.createCanvas(window.innerWidth, window.innerHeight).parent("p5-holder");
+
+          // 初始化遮罩
+          maskLayer = p.createGraphics(p.width, p.height);
+          maskLayer.background(255);
+          maskLayer.noStroke();
+
+          // 啟動攝影機
+          cam = p.createCapture(
+            { video: true },
+            stream => console.log("📷 鏡頭已啟用")
+          );
+          cam.size(p.width, p.height);
+          cam.hide();
+
+          // 初始化 handpose
+          handpose = ml5.handpose(cam, () => {
+            console.log("🤖 handpose 模型已載入");
+          });
+
+          // 接收預測結果
+          handpose.on("predict", results => {
+            predictions = results;
+          });
+        };
+
+        p.draw = () => {
+          p.clear();
+
+          // 顯示背景圖
+          p.image(bgImg, 0, 0, p.width, p.height);
+
+          // 疊上遮罩
+          p.image(maskLayer, 0, 0, p.width, p.height);
+
+          // 處理每隻手
+          for (let hand of predictions) {
+            let indexTip = hand.landmarks[8]; // 食指指尖
+            let x = p.map(indexTip[0], 0, cam.width, 0, p.width);
+            let y = p.map(indexTip[1], 0, cam.height, 0, p.height);
+
+            // 擦除洞
+            maskLayer.erase();
+            maskLayer.ellipse(x, y, 80, 80);
+            maskLayer.noErase();
+
+            // 可選：視覺化食指位置（紅圓）
+            p.fill(255, 0, 0);
+            p.noStroke();
+            p.ellipse(x, y, 30, 30);
+          }
+        };
+
+        p.windowResized = () => {
+          p.resizeCanvas(window.innerWidth, window.innerHeight);
+          maskLayer = p.createGraphics(p.width, p.height);
+          maskLayer.background(255);
+        };
       });
-
-      function startP5() {
-        new p5(p => {
-          let cam;
-          let handpose;
-          let predictions = [];
-
-          p.setup = () => {
-            p.createCanvas(window.innerWidth, window.innerHeight).parent("p5-holder");
-            cam = p.createCapture(p.VIDEO);
-            cam.size(p.width, p.height);
-            cam.hide();
-
-            handpose = ml5.handpose(cam, () => {
-              console.log("🤖 Handpose model loaded.");
-            });
-
-            handpose.on("predict", results => {
-              predictions = results;
-            });
-          };
-
-          p.draw = () => {
-            p.push();
-            p.translate(p.width, 0);
-            p.scale(-1, 1); // Mirror the video
-            p.image(cam, 0, 0, p.width, p.height);
-            p.pop();
-
-            // Draw hand landmarks
-            p.noFill();
-            p.stroke(0, 255, 0);
-            p.strokeWeight(2);
-
-            for (let hand of predictions) {
-              for (let pt of hand.landmarks) {
-                p.circle(pt[0], pt[1], 10);
-              }
-
-              // Example: draw larger circle on index fingertip
-              let index = hand.landmarks[8];
-              p.fill(255, 0, 0);
-              p.noStroke();
-              p.circle(index[0], index[1], 30);
+    }
+  </script>
+</body>
+</html>
