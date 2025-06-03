@@ -83,7 +83,7 @@
 
           // 載入 handpose
           handpose = ml5.handpose(cam, () => {
-            console.log("🧠 handpose 載入完成");
+            console.log(cam.width, cam.height);
           });
           handpose.on("predict", results => {
             predictions = results;
