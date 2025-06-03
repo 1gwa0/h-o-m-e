@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>鏡頭測試</title>
+  <title>鏡頭測試 Safari 版</title>
   <style>
     html, body {
       margin: 0;
@@ -24,30 +24,75 @@
     new p5(p => {
       let cam;
       let camReady = false;
+      let state = "intro"; // intro → waitClick → camera
+      let introStartTime;
+      let t = 0;
 
       p.setup = () => {
         p.createCanvas(window.innerWidth, window.innerHeight).parent("p5-holder");
-        cam = p.createCapture(p.VIDEO, () => {
-          console.log("📷 鏡頭啟動成功");
-          camReady = true;
-        });
-        cam.size(p.width, p.height);
-        cam.hide();
+        introStartTime = p.millis();
       };
 
       p.draw = () => {
         p.background(0);
 
-        if (camReady) {
-          p.image(cam, 0, 0, p.width, p.height);
-        } else {
-          // 可選提示字，也可以移除
+        if (state === "intro") {
+          // 🔸 你可以替換這裡的動畫內容
+          p.fill(255);
+          p.noStroke();
+          p.ellipse(p.width / 2, p.height / 2, 100 + 30 * p.sin(t));
+          t += 0.1;
+
+          if (p.millis() - introStartTime > 3000) {
+            state = "waitClick";
+          }
+        }
+
+        else if (state === "waitClick") {
           p.fill(255);
           p.textAlign(p.CENTER, p.CENTER);
           p.textSize(24);
-          p.text("正在啟動鏡頭...", p.width / 2, p.height / 2);
+          p.text("點擊畫面以啟動鏡頭", p.width / 2, p.height / 2);
+        }
+
+        else if (state === "camera") {
+          if (camReady) {
+            p.image(cam, 0, 0, p.width, p.height);
+
+            // 加上互動畫面動畫（範例）
+            const r = 50 + 20 * p.sin(t);
+            p.noFill();
+            p.stroke(255, 0, 0);
+            p.strokeWeight(3);
+            p.ellipse(p.width / 2, p.height / 2, r, r);
+            t += 0.05;
+          } else {
+            p.fill(255);
+            p.textAlign(p.CENTER, p.CENTER);
+            p.textSize(20);
+            p.text("鏡頭載入中...", p.width / 2, p.height / 2);
+          }
         }
       };
+
+      p.mousePressed = () => {
+        if (state === "waitClick") {
+          initCamera(); // Safari 限制：只能在使用者觸發後呼叫
+          state = "camera";
+        }
+      };
+
+      function initCamera() {
+        cam = p.createCapture(p.VIDEO);
+        cam.size(p.width, p.height);
+        cam.hide();
+
+        // ✅ Safari 需要用 loadeddata 來檢查是否可顯示影像
+        cam.elt.addEventListener('loadeddata', () => {
+          camReady = true;
+          console.log("📷 鏡頭已準備好（Safari）");
+        });
+      }
 
       p.windowResized = () => {
         p.resizeCanvas(window.innerWidth, window.innerHeight);
